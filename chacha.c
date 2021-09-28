@@ -70,6 +70,7 @@ main(int32_t argc, char *argv[]){
                             openGen=gen;
                             openGenD=1;
                         }
+                        randombytes_buf((void*)key, 32);
                         keyName=argv[++iter];
                         ctrl=1;
                         break;
@@ -221,7 +222,8 @@ shuffle(uint32_t *matrix, uint32_t block){
     return mat;
 }
 
-void shuffleSide(uint32_t *matrix, _Bool side){
+void 
+shuffleSide(uint32_t *matrix, _Bool side){
     uint32_t *a, *b, *c, *d;
     if(side){
         a=&matrix[0];
@@ -264,10 +266,14 @@ void shuffleSide(uint32_t *matrix, _Bool side){
 }
 
 
-static inline uint32_t bitShift(uint32_t target, uint8_t bits){
+static inline
+uint32_t
+bitShift(uint32_t target, uint8_t bits){
     return (target<<bits)|(target>>(32-bits));
 }
 
-static inline uint32_t addmod(uint32_t number1, uint32_t number2){
+static inline
+uint32_t
+addmod(uint32_t number1, uint32_t number2){
     return number1+number2;
 }
