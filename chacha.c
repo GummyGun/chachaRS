@@ -37,7 +37,19 @@ main(int32_t argc, char *argv[]){
     
     FILE *cargo;
     FILE *output;
-    
+    /*
+    flag suport
+        k:
+            selects encrypting key from document named as next argument
+        g:
+            generates new key and saves it with the name specified as next argument. cant be used at the same time as k
+        o:
+            saves the encrypted/decripted data to file named as the next argument
+        
+        the file specified with no flags before is taken as the input.
+        
+    */
+   
     for(int8_t iter=1; iter<argc; iter++){
         if(argv[iter][0]=='-'){
             
@@ -92,7 +104,7 @@ main(int32_t argc, char *argv[]){
                     break;
                 }
             }
-        }else{
+        }else{ //only one file can be specified as input
             if(fileOpened){
                 return 4;
             }else{
@@ -109,10 +121,10 @@ main(int32_t argc, char *argv[]){
     }
     
     
+    //generates random bytes if neither -k -g are present 
     strcpy((char*)(void*)matrix, "expand 32-byte k");
     if(!openGenD){
         randombytes_buf((void*)key, 32);
-        //printUint(key, 8);
     }
     
     uint32_t nuo[3]={0,0,0};
@@ -122,6 +134,7 @@ main(int32_t argc, char *argv[]){
     uint32_t bn=0;
     uint32_t *shuffled;
     
+    //creates the name of the .key file if flag -g not present
     if(!openGenD){
         char *dif=strchr(argv[target], '.');
         int32_t targetLen;
@@ -134,6 +147,7 @@ main(int32_t argc, char *argv[]){
         snprintf(keyName, targetLen+5, "%.*s.key", targetLen, argv[target]);
     }
     
+    //save key to document active if -k not present
     if(openGen==gen){
         FILE *keySav=fopen(keyName, "wb");
         fwrite(key, 4, 8, keySav);
@@ -146,16 +160,21 @@ main(int32_t argc, char *argv[]){
     
     int8_t readSize=0;
     int64_t iter=0;
+    //read until the input is finished
     while(readSize=fread(&buff, 1, 4, cargo)){
         if(iter%16==0){
             shuffled=shuffle(matrix, iter/16);
         }
         encryptedBytes=shuffled[iter%16];
+        //makes the xor 
+        
         buff=encryptedBytes^buff;
+        
         if(feof(cargo)){
             readSize--;
         }
         
+        //conditional whether -o is present or not
         if(outputMode==std){
             printAsChars(buff, readSize);
         }else{
@@ -178,7 +197,7 @@ main(int32_t argc, char *argv[]){
     }
     return 0;
 }
-
+//prints bin data correctly to stdout 
 void 
 printAsChars(uint32_t number, int8_t charNum){
     char *tmp=(char*)(void*)&number;
@@ -188,6 +207,7 @@ printAsChars(uint32_t number, int8_t charNum){
     
 }
 
+//debug function
 void 
 printUint(uint32_t key[], int8_t size){
     for(int32_t iter=0; iter<size; iter++){
@@ -196,6 +216,7 @@ printUint(uint32_t key[], int8_t size){
     printf("\n");
 }
 
+//fusses data into matrix
 void 
 genMat(uint32_t *matrix, uint32_t *key, uint32_t nuo[3]){
     memcpy((void*)&matrix[4], key, 32);
@@ -203,6 +224,7 @@ genMat(uint32_t *matrix, uint32_t *key, uint32_t nuo[3]){
     memcpy((void*)&matrix[13], nuo, 12);
 }
 
+//shuffles matrix 
 uint32_t*
 shuffle(uint32_t *matrix, uint32_t block){
     uint32_t *mat=(uint32_t*)malloc(64);
@@ -222,6 +244,7 @@ shuffle(uint32_t *matrix, uint32_t block){
     return mat;
 }
 
+//runs algorithm chacha20
 void 
 shuffleSide(uint32_t *matrix, _Bool side){
     uint32_t *a, *b, *c, *d;
@@ -264,7 +287,6 @@ shuffleSide(uint32_t *matrix, _Bool side){
     }
     //printUint(matrix, 16);
 }
-
 
 static inline
 uint32_t
