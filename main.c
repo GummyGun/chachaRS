@@ -7,39 +7,53 @@ void printUint(uint32_t key[], int8_t size);
 uint32_t* shuffle(uint32_t *matrix, uint32_t block);
 void shuffleSide(uint32_t *matrix, _Bool side);
 void genMat(uint32_t *matrix, uint32_t *key, uint32_t nuo[3]);
+void printAsChars(uint32_t number, int8_t charNum);
 static inline uint32_t addmod(uint32_t number1, uint32_t number2);
 static inline uint32_t bitShift(uint32_t target, uint8_t bits);
 
-enum MODE{
-    encode,
-    decode
+enum OUTPUTMODE{
+    std,
+    file
 };
 
-int 
-main(int argc, char *argv[]){
+enum OPENGEN{
+    open,
+    gen
+};
+
+int32_t
+main(int32_t argc, char *argv[]){
+    int32_t target=0;
+    char *keyName;
+    
     uint32_t *matrix=(uint32_t*)malloc(512/8);
-    _Bool openGenD=0;
     uint32_t key[8]={};
-    _Bool modeD=0;
-    enum MODE mode=encode;
+    _Bool openGenD=0;
+    enum OPENGEN openGen=gen;
+    _Bool fileOpened=0;
+    _Bool outputModeD=0;
+    enum OUTPUTMODE outputMode=std;
+    
+    
     FILE *cargo;
+    FILE *output;
     
     for(int8_t iter=1; iter<argc; iter++){
         if(argv[iter][0]=='-'){
-            int8_t flags=strlen(argv[iter]);
             
+            int8_t flags=strlen(argv[iter]);
             for(int8_t iterFlags=1; iterFlags<flags; iterFlags++){
                 _Bool ctrl=0;
                 switch(argv[iter][iterFlags]){
                     case 'k':{
                         if(openGenD){
-                            return -1;
+                            return 1;
                         }else{
+                            openGen=open;
                             openGenD=1;
                         }
                         FILE *keyDoc;
-                        
-                        keyDoc=fopen(argv[iter++], "rb");
+                        keyDoc=fopen(argv[++iter], "rb");
                         if(errno!=0){
                             perror("Error openening key");
                         }else{
@@ -51,91 +65,125 @@ main(int argc, char *argv[]){
                     }
                     case 'g':{
                         if(openGenD){
-                            return -1;
+                            return 1;
                         }else{
+                            openGen=gen;
                             openGenD=1;
                         }
-                        randombytes_buf((void*)key, 32);
-                        
+                        keyName=argv[++iter];
+                        ctrl=1;
                         break;
                     }
-                    /*
-                    case 'd':{
-                        if(modeD){
+                    case 'o':{
+                        if(outputModeD){
                             return 2;
                         }else{
-                            mode=decode;
-                            modeD=1;
+                            outputMode=file;
+                            outputModeD=1;
                         }
-                        mode=decode;
+                        output=fopen(argv[++iter], "wb");
+                        ctrl=1;
                         break;
                     }
-                    
-                    case 'e':{
-                        if(modeD){
-                            return 2;
-                        }else{
-                            mode=encode;
-                            modeD=1;
-                        }
-                        break;
-                    }
-                    */
                 }
                 if(ctrl){
-                    continue;
+                    ctrl=0;
+                    break;
                 }
             }
         }else{
-            printf("file to operate in %s\n", argv[iter]);
+            if(fileOpened){
+                return 4;
+            }else{
+                fileOpened=1;
+            }
+            target=iter;
+            //printf("file to operate in %s\n", argv[iter]);
             cargo=fopen(argv[iter], "rb");
         }
     }
+    if(!fileOpened){
+        printf("no file opened\n");
+        return 3;
+    }
+    
+    
     strcpy((char*)(void*)matrix, "expand 32-byte k");
     if(!openGenD){
-        //randombytes_buf((void*)key, 32);
+        randombytes_buf((void*)key, 32);
+        //printUint(key, 8);
     }
     
     uint32_t nuo[3]={0,0,0};
-    
-    //scanf("%d\n%d\n%d", nuo, nuo+1, nuo+2);
+    scanf("%d\n%d\n%d", nuo, nuo+1, nuo+2);
     
     genMat(matrix, key, nuo);
     uint32_t bn=0;
-    //printUint(matrix, 16);
-    uint32_t *shuffled=shuffle(matrix, 0);
-    //printUint(shuffled, 16);
+    uint32_t *shuffled;
     
-    FILE *keySav=fopen("key.key", "wb");
-    fwrite(key, 4, 8, keySav);
-    fclose(keySav);
+    if(!openGenD){
+        char *dif=strchr(argv[target], '.');
+        int32_t targetLen;
+        if(!dif){
+            targetLen=strlen(argv[target]);
+        }else{
+            targetLen=dif-argv[target];
+        }
+        keyName=(char*)malloc(targetLen+5);
+        snprintf(keyName, targetLen+5, "%.*s.key", targetLen, argv[target]);
+    }
+    
+    if(openGen==gen){
+        FILE *keySav=fopen(keyName, "wb");
+        fwrite(key, 4, 8, keySav);
+        fclose(keySav);
+    }
+    
     
     uint32_t buff=0;
     uint32_t encryptedBytes;
     
-    fread(&buff, 1, 1, cargo);
-    
-    for(int64_t iter=0; 0; iter++){
-        printf("no ha tronado\n");
-        if(iter/16==1){
-            free(shuffled);
+    int8_t readSize=0;
+    int64_t iter=0;
+    while(readSize=fread(&buff, 1, 4, cargo)){
+        if(iter%16==0){
             shuffled=shuffle(matrix, iter/16);
         }
-        encryptedBytes=shuffled[iter++];
-        printf("%s", encryptedBytes^buff);
+        encryptedBytes=shuffled[iter%16];
+        buff=encryptedBytes^buff;
+        if(feof(cargo)){
+            readSize--;
+        }
+        
+        if(outputMode==std){
+            printAsChars(buff, readSize);
+        }else{
+            fwrite(&buff, 1, readSize, output);
+        }
+        
         memset((void*)&buff, 0, 4);
+        
+        if(iter%16==15){
+            free(shuffled);
+        }
+        iter++;
     }
-    printf("\n");
-    free(shuffled);
+    if(outputMode==std){
+        printf("\n");
+    }
     fclose(cargo);
+    if(outputMode==file){
+        fclose(output);
+    }
     return 0;
 }
 
-void flagG(){
-    
-}
-
-void flagD(){
+void 
+printAsChars(uint32_t number, int8_t charNum){
+    char *tmp=(char*)(void*)&number;
+    for(int8_t iter=0; iter<charNum; iter++){
+        printf("%c",tmp[iter]);
+    }
     
 }
 
@@ -158,7 +206,10 @@ uint32_t*
 shuffle(uint32_t *matrix, uint32_t block){
     uint32_t *mat=(uint32_t*)malloc(64);
     memcpy((void*)mat, (void*)matrix, 64);
+    mat[12]=block;
     
+    
+    //printUint(mat, 16);
     for(int8_t iter=0; iter<20; iter++){
         if(iter%2){
             shuffleSide(mat,1);
@@ -166,6 +217,7 @@ shuffle(uint32_t *matrix, uint32_t block){
             shuffleSide(mat,0);
         }
     }
+    //printUint(mat, 16);
     return mat;
 }
 
@@ -186,7 +238,7 @@ void shuffleSide(uint32_t *matrix, _Bool side){
         //printf("a-pre%x\nb-pre%x\nc-pre%x\nd-pre%x\n", *a, *b, *c, *d);
         *a=addmod(*b,*a);
         *d=*d^*a;
-        *d=bitShift(*b, 16);
+        *d=bitShift(*d, 16);
         *c=addmod(*d, *c);
         *b=*b^*c;
         *b=bitShift(*b, 12);

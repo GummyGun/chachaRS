@@ -1,2 +1,2 @@
 all:
-	gcc main.c -lsodium
+	gcc main.c -lsodium -o chachaRS
