@@ -244,7 +244,7 @@ shuffle(uint32_t *matrix, uint32_t block){
     return mat;
 }
 
-//runs algorithm chacha20
+//runs algorithm chacha20 side decides whether it is row or column
 void 
 shuffleSide(uint32_t *matrix, _Bool side){
     uint32_t *a, *b, *c, *d;
